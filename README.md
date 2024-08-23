@@ -2,7 +2,7 @@
 
 ## Overview
 
-The Roblox Claude Code Updater Plugin is a powerful tool that leverages the Claude AI to assist developers in updating their Roblox game scripts. This plugin allows you to make code changes across multiple scripts in your game with natural language requests, streamlining the development process and enhancing productivity.
+This plugin allows you to make code changes across multiple scripts in your game with natural language requests, streamlining the development process and enhancing productivity. The Roblox Claude Code Updater Plugin is a powerful tool that allows developers to choose their model of choice, use their own API keys, and undo submitted changes to assist developers in updating their Roblox game scripts. 
 
 ## Demo Video Link
 https://www.youtube.com/watch?v=xd7TuNURKYw
