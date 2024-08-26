@@ -1,15 +1,14 @@
-# Roblox Claude Code Updater Plugin
+# RoCopilot - Roblox Coding Agent Plugin
 
 ## Overview
 
-This plugin allows you to make code changes across multiple scripts in your game with natural language requests, streamlining the development process and enhancing productivity. The Roblox Claude Code Updater Plugin is a powerful tool that allows developers to choose their model of choice, use their own API keys, and undo submitted changes to assist developers in updating their Roblox game scripts. 
-
+This plugin allows you to make code changes across multiple scripts in your game with natural language requests, streamlining the development process and enhancing productivity. The RoCopilot - Roblox Coding Agent Plugin is a powerful tool that allows developers to choose their AI model of choice and their own API keys to make natural language requests into new scripts, updated existing scripts, and net new code development. 
 ## Demo Video Link
 https://www.youtube.com/watch?v=xd7TuNURKYw
 
 ## Features
 
-- **AI-Powered Code Updates**: Utilize Claude AI to interpret and implement code changes based on natural language requests.
+- **AI-Powered Code Updates**: Utilize Anthropic/Google/OpenAI models to interpret and implement code changes based on natural language requests.
 - **Multi-Script Support**: Automatically search and update code across ServerScriptService, ReplicatedStorage, and StarterGui.
 - **User-Friendly Interface**: A simple GUI for entering update requests and viewing results.
 - **Code Preview**: Automatically opens updated scripts in the Roblox Studio script editor for review.
