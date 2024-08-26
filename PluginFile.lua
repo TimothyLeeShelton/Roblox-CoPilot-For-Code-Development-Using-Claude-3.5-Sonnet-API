@@ -1,29 +1,37 @@
 --Fun statement to test a single script being changed at a time: Add a print statement to the onboardingtutorialcontrol script in serverscriptservice at the start of the "updateDataStore" function. 
 --Fun statement to test multiple scripts being changed at a time: Add a print statement to the onboardingtutorialcontrol script in serverscriptservice at the start of the "updateDataStore" function. For a second change, adjust the MAX_PAIRS_PER_KEY value in TimePlayedDataStore to 19999.
 
+
+
+
+
+--Going to add "I'm Feeling lucky" wildcards where we essentially create pickable cards of what the user could build. 
+--Going to add some kind of loading screen indicator while we wait for prompts to complete so users know to chill. 
+
 -- Required services
-local HttpService = game:GetService("HttpService")  -- For making HTTP requests and JSON encoding/decoding
-local ServerStorage = game:GetService("ServerStorage")  -- For accessing server-side storage
-local ScriptEditorService = game:GetService("ScriptEditorService")  -- For updating script sources
-local UserInputService = game:GetService("UserInputService")  -- For handling user input
-local ChangeHistoryService = game:GetService("ChangeHistoryService")  -- For managing undo/redo functionality
+local HttpService = game:GetService("HttpService")
+local ServerStorage = game:GetService("ServerStorage")
+local ScriptEditorService = game:GetService("ScriptEditorService")
+local UserInputService = game:GetService("UserInputService")
+local ChangeHistoryService = game:GetService("ChangeHistoryService")
 
 -- Variables for API selection and key
-local selectedAPIProvider = nil  -- Stores the selected API provider
-local apiKey = nil  -- Stores the API key
+local selectedAPIProvider = nil
+local apiKey = nil
 
-local scriptBackups = {}  -- Table to store backups of original scripts
-local undoButton  -- Variable to hold the undo button GUI element
+local existingScripts = {} 
+local scriptBackups = {}
+local undoButton
 
 -- Create DockWidgetPluginGui
 local widgetInfo = DockWidgetPluginGuiInfo.new(
-	Enum.InitialDockState.Float,  -- Initial dock state
-	false,  -- Initially enabled
-	false,  -- Override enabled
-	400,  -- Default width
-	300,  -- Default height
-	300,  -- Minimum width
-	200   -- Minimum height
+	Enum.InitialDockState.Float,
+	false,
+	false,
+	400,
+	300,
+	300,
+	200
 )
 
 -- Create the main plugin GUI
@@ -31,169 +39,169 @@ local pluginGui = plugin:CreateDockWidgetPluginGui("CodeUpdaterGUI", widgetInfo)
 pluginGui.Title = "Code Updater"
 
 -- Create main Frame
-local Frame = Instance.new("Frame")  -- Create the main frame for the GUI
-Frame.Size = UDim2.new(1, 0, 1, 0)  -- Set frame size to fill the entire plugin window
-Frame.BackgroundColor3 = Color3.fromRGB(247, 250, 252)  -- Set background color
-Frame.BorderSizePixel = 0  -- Remove border
-Frame.Parent = pluginGui  -- Set parent to the plugin GUI
+local Frame = Instance.new("Frame")
+Frame.Size = UDim2.new(1, 0, 1, 0)
+Frame.BackgroundColor3 = Color3.fromRGB(247, 250, 252)
+Frame.BorderSizePixel = 0
+Frame.Parent = pluginGui
 
-local FrameCorner = Instance.new("UICorner")  -- Create rounded corners for the frame
-FrameCorner.CornerRadius = UDim.new(0, 8)  -- Set corner radius
-FrameCorner.Parent = Frame  -- Set parent to the main frame
+local FrameCorner = Instance.new("UICorner")
+FrameCorner.CornerRadius = UDim.new(0, 8)
+FrameCorner.Parent = Frame
 
 -- Create API Provider Dropdown
-local APIProviderDropdown = Instance.new("TextButton")  -- Create dropdown button for API provider selection
-APIProviderDropdown.Size = UDim2.new(0.3, 0, 0.1, 0)  -- Set button size
-APIProviderDropdown.Position = UDim2.new(0.68, 0, 0.02, 0)  -- Set button position
-APIProviderDropdown.Text = "API Provider"  -- Set button text
-APIProviderDropdown.Font = Enum.Font.SourceSansBold  -- Set font
-APIProviderDropdown.TextSize = 14  -- Set text size
-APIProviderDropdown.TextColor3 = Color3.fromRGB(255, 255, 255)  -- Set text color
-APIProviderDropdown.BackgroundColor3 = Color3.fromRGB(99, 91, 255)  -- Set background color
-APIProviderDropdown.Parent = Frame  -- Set parent to the main frame
+local APIProviderDropdown = Instance.new("TextButton")
+APIProviderDropdown.Size = UDim2.new(0.3, 0, 0.1, 0)
+APIProviderDropdown.Position = UDim2.new(0.68, 0, 0.02, 0)
+APIProviderDropdown.Text = "API Provider"
+APIProviderDropdown.Font = Enum.Font.SourceSansBold
+APIProviderDropdown.TextSize = 14
+APIProviderDropdown.TextColor3 = Color3.fromRGB(255, 255, 255)
+APIProviderDropdown.BackgroundColor3 = Color3.fromRGB(99, 91, 255)
+APIProviderDropdown.Parent = Frame
 
-local DropdownCorner = Instance.new("UICorner")  -- Create rounded corners for the dropdown button
-DropdownCorner.CornerRadius = UDim.new(0, 4)  -- Set corner radius
-DropdownCorner.Parent = APIProviderDropdown  -- Set parent to the dropdown button
+local DropdownCorner = Instance.new("UICorner")
+DropdownCorner.CornerRadius = UDim.new(0, 4)
+DropdownCorner.Parent = APIProviderDropdown
 
 -- Create Dropdown Menu
-local DropdownMenu = Instance.new("Frame")  -- Create frame for dropdown menu
-DropdownMenu.Size = UDim2.new(0.3, 0, 0.3, 0)  -- Set menu size
-DropdownMenu.Position = UDim2.new(0.68, 0, 0.12, 0)  -- Set menu position
-DropdownMenu.BackgroundColor3 = Color3.fromRGB(255, 255, 255)  -- Set background color
-DropdownMenu.Visible = false  -- Initially hidden
-DropdownMenu.ZIndex = 10  -- Ensure it appears on top
-DropdownMenu.Parent = Frame  -- Set parent to the main frame
+local DropdownMenu = Instance.new("Frame")
+DropdownMenu.Size = UDim2.new(0.3, 0, 0.3, 0)
+DropdownMenu.Position = UDim2.new(0.68, 0, 0.12, 0)
+DropdownMenu.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+DropdownMenu.Visible = false
+DropdownMenu.ZIndex = 10
+DropdownMenu.Parent = Frame
 
-local MenuCorner = Instance.new("UICorner")  -- Create rounded corners for the dropdown menu
-MenuCorner.CornerRadius = UDim.new(0, 4)  -- Set corner radius
-MenuCorner.Parent = DropdownMenu  -- Set parent to the dropdown menu
+local MenuCorner = Instance.new("UICorner")
+MenuCorner.CornerRadius = UDim.new(0, 4)
+MenuCorner.Parent = DropdownMenu
 
 -- Create API Key Input
-local APIKeyInput = Instance.new("TextBox")  -- Create textbox for API key input
-APIKeyInput.Size = UDim2.new(0.8, 0, 0.1, 0)  -- Set textbox size
-APIKeyInput.Position = UDim2.new(0.1, 0, 0.2, 0)  -- Set textbox position
-APIKeyInput.ClearTextOnFocus = false  -- Don't clear text when focused
-APIKeyInput.Font = Enum.Font.SourceSans  -- Set font
-APIKeyInput.TextSize = 12  -- Set text size
-APIKeyInput.TextColor3 = Color3.fromRGB(0, 0, 0)  -- Set text color
-APIKeyInput.BackgroundColor3 = Color3.fromRGB(255, 255, 255)  -- Set background color
-APIKeyInput.Visible = false  -- Initially hidden
-APIKeyInput.Parent = Frame  -- Set parent to the main frame
+local APIKeyInput = Instance.new("TextBox")
+APIKeyInput.Size = UDim2.new(0.8, 0, 0.1, 0)
+APIKeyInput.Position = UDim2.new(0.1, 0, 0.2, 0)
+APIKeyInput.ClearTextOnFocus = false
+APIKeyInput.Font = Enum.Font.SourceSans
+APIKeyInput.TextSize = 12
+APIKeyInput.TextColor3 = Color3.fromRGB(0, 0, 0)
+APIKeyInput.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+APIKeyInput.Visible = false
+APIKeyInput.Parent = Frame
 
-local APIKeyCorner = Instance.new("UICorner")  -- Create rounded corners for the API key input
-APIKeyCorner.CornerRadius = UDim.new(0, 4)  -- Set corner radius
-APIKeyCorner.Parent = APIKeyInput  -- Set parent to the API key input
+local APIKeyCorner = Instance.new("UICorner")
+APIKeyCorner.CornerRadius = UDim.new(0, 4)
+APIKeyCorner.Parent = APIKeyInput
 
 -- Create Use API Key Button
-local UseAPIKeyButton = Instance.new("TextButton")  -- Create button to confirm API key
-UseAPIKeyButton.Size = UDim2.new(0.3, 0, 0.1, 0)  -- Set button size
-UseAPIKeyButton.Position = UDim2.new(0.35, 0, 0.32, 0)  -- Set button position
-UseAPIKeyButton.Text = "Use This API Key"  -- Set button text
-UseAPIKeyButton.Font = Enum.Font.SourceSansBold  -- Set font
-UseAPIKeyButton.TextSize = 14  -- Set text size
-UseAPIKeyButton.TextColor3 = Color3.fromRGB(255, 255, 255)  -- Set text color
-UseAPIKeyButton.BackgroundColor3 = Color3.fromRGB(99, 91, 255)  -- Set background color
-UseAPIKeyButton.Visible = false  -- Initially hidden
-UseAPIKeyButton.Parent = Frame  -- Set parent to the main frame
+local UseAPIKeyButton = Instance.new("TextButton")
+UseAPIKeyButton.Size = UDim2.new(0.3, 0, 0.1, 0)
+UseAPIKeyButton.Position = UDim2.new(0.35, 0, 0.32, 0)
+UseAPIKeyButton.Text = "Use This API Key"
+UseAPIKeyButton.Font = Enum.Font.SourceSansBold
+UseAPIKeyButton.TextSize = 14
+UseAPIKeyButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+UseAPIKeyButton.BackgroundColor3 = Color3.fromRGB(99, 91, 255)
+UseAPIKeyButton.Visible = false
+UseAPIKeyButton.Parent = Frame
 
-local UseKeyCorner = Instance.new("UICorner")  -- Create rounded corners for the Use API Key button
-UseKeyCorner.CornerRadius = UDim.new(0, 4)  -- Set corner radius
-UseKeyCorner.Parent = UseAPIKeyButton  -- Set parent to the Use API Key button
+local UseKeyCorner = Instance.new("UICorner")
+UseKeyCorner.CornerRadius = UDim.new(0, 4)
+UseKeyCorner.Parent = UseAPIKeyButton
 
 -- Create ScrollingFrame for user input
-local ScrollingFrame = Instance.new("ScrollingFrame")  -- Create scrolling frame for user input
-ScrollingFrame.Size = UDim2.new(0.9, 0, 0.5, 0)  -- Set frame size
-ScrollingFrame.Position = UDim2.new(0.05, 0, 0.15, 0)  -- Set frame position
-ScrollingFrame.BackgroundTransparency = 1  -- Make background transparent
-ScrollingFrame.ScrollBarThickness = 6  -- Set scrollbar thickness
-ScrollingFrame.ScrollingEnabled = true  -- Enable scrolling
-ScrollingFrame.Parent = Frame  -- Set parent to the main frame
-ScrollingFrame.ScrollingDirection = Enum.ScrollingDirection.Y  -- Allow vertical scrolling
-ScrollingFrame.VerticalScrollBarPosition = Enum.VerticalScrollBarPosition.Right  -- Position scrollbar on the right
-ScrollingFrame.Visible = false  -- Initially hidden
+local ScrollingFrame = Instance.new("ScrollingFrame")
+ScrollingFrame.Size = UDim2.new(0.9, 0, 0.5, 0)
+ScrollingFrame.Position = UDim2.new(0.05, 0, 0.15, 0)
+ScrollingFrame.BackgroundTransparency = 1
+ScrollingFrame.ScrollBarThickness = 6
+ScrollingFrame.ScrollingEnabled = true
+ScrollingFrame.Parent = Frame
+ScrollingFrame.ScrollingDirection = Enum.ScrollingDirection.Y
+ScrollingFrame.VerticalScrollBarPosition = Enum.VerticalScrollBarPosition.Right
+ScrollingFrame.Visible = false
 
 -- Create TextBox for user input
-local UserRequestInput = Instance.new("TextBox")  -- Create textbox for user input
-UserRequestInput.Size = UDim2.new(1, 0, 1, 0)  -- Set textbox size to fill the scrolling frame
-UserRequestInput.Position = UDim2.new(0, 0, 0, 0)  -- Set textbox position
-UserRequestInput.Text = "Enter your code update request here..."  -- Set default text
-UserRequestInput.TextColor3 = Color3.fromRGB(66, 84, 102)  -- Set text color
-UserRequestInput.BackgroundColor3 = Color3.fromRGB(241, 244, 227)  -- Set background color
-UserRequestInput.Font = Enum.Font.SourceSansSemibold  -- Set font
-UserRequestInput.MultiLine = true  -- Allow multiple lines
-UserRequestInput.TextWrapped = true  -- Enable text wrapping
-UserRequestInput.TextSize = 14  -- Set text size
-UserRequestInput.ClearTextOnFocus = false  -- Don't clear text when focused
-UserRequestInput.Parent = ScrollingFrame  -- Set parent to the scrolling frame
+local UserRequestInput = Instance.new("TextBox")
+UserRequestInput.Size = UDim2.new(1, 0, 1, 0)
+UserRequestInput.Position = UDim2.new(0, 0, 0, 0)
+UserRequestInput.Text = "Enter your code update request here..."
+UserRequestInput.TextColor3 = Color3.fromRGB(66, 84, 102)
+UserRequestInput.BackgroundColor3 = Color3.fromRGB(241, 244, 227)
+UserRequestInput.Font = Enum.Font.SourceSansSemibold
+UserRequestInput.MultiLine = true
+UserRequestInput.TextWrapped = true
+UserRequestInput.TextSize = 14
+UserRequestInput.ClearTextOnFocus = false
+UserRequestInput.Parent = ScrollingFrame
 
-local TextBoxCorner = Instance.new("UICorner")  -- Create rounded corners for the user input textbox
-TextBoxCorner.CornerRadius = UDim.new(0, 4)  -- Set corner radius
-TextBoxCorner.Parent = UserRequestInput  -- Set parent to the user input textbox
+local TextBoxCorner = Instance.new("UICorner")
+TextBoxCorner.CornerRadius = UDim.new(0, 4)
+TextBoxCorner.Parent = UserRequestInput
 
-local TextBoxPadding = Instance.new("UIPadding")  -- Create padding for the user input textbox
-TextBoxPadding.PaddingLeft = UDim.new(0, 8)  -- Set left padding
-TextBoxPadding.PaddingRight = UDim.new(0, 8)  -- Set right padding
-TextBoxPadding.PaddingTop = UDim.new(0, 8)  -- Set top padding
-TextBoxPadding.PaddingBottom = UDim.new(0, 8)  -- Set bottom padding
-TextBoxPadding.Parent = UserRequestInput  -- Set parent to the user input textbox
+local TextBoxPadding = Instance.new("UIPadding")
+TextBoxPadding.PaddingLeft = UDim.new(0, 8)
+TextBoxPadding.PaddingRight = UDim.new(0, 8)
+TextBoxPadding.PaddingTop = UDim.new(0, 8)
+TextBoxPadding.PaddingBottom = UDim.new(0, 8)
+TextBoxPadding.Parent = UserRequestInput
 
-local TextSizeConstraint = Instance.new("UITextSizeConstraint")  -- Create text size constraint for the user input textbox
-TextSizeConstraint.MaxTextSize = 14  -- Set maximum text size
-TextSizeConstraint.MinTextSize = 10  -- Set minimum text size
-TextSizeConstraint.Parent = UserRequestInput  -- Set parent to the user input textbox
+local TextSizeConstraint = Instance.new("UITextSizeConstraint")
+TextSizeConstraint.MaxTextSize = 14
+TextSizeConstraint.MinTextSize = 10
+TextSizeConstraint.Parent = UserRequestInput
 
 -- Create Send Button
-local SendButton = Instance.new("TextButton")  -- Create button to send update request
-SendButton.Size = UDim2.new(0.3, 0, 0.15, 0)  -- Set button size
-SendButton.Position = UDim2.new(0.35, 0, 0.7, 0)  -- Set button position
-SendButton.Text = "Update Code"  -- Set button text
-SendButton.Font = Enum.Font.SourceSansBold  -- Set font
-SendButton.TextSize = 16  -- Set text size
-SendButton.TextColor3 = Color3.fromRGB(255, 255, 255)  -- Set text color
-SendButton.BackgroundColor3 = Color3.fromRGB(99, 91, 255)  -- Set background color
-SendButton.Parent = Frame  -- Set parent to the main frame
-SendButton.Visible = false  -- Initially hidden
+local SendButton = Instance.new("TextButton")
+SendButton.Size = UDim2.new(0.3, 0, 0.15, 0)
+SendButton.Position = UDim2.new(0.35, 0, 0.7, 0)
+SendButton.Text = "Update Code"
+SendButton.Font = Enum.Font.SourceSansBold
+SendButton.TextSize = 16
+SendButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+SendButton.BackgroundColor3 = Color3.fromRGB(99, 91, 255)
+SendButton.Parent = Frame
+SendButton.Visible = false
 
-local ButtonCorner = Instance.new("UICorner")  -- Create rounded corners for the send button
-ButtonCorner.CornerRadius = UDim.new(0, 4)  -- Set corner radius
-ButtonCorner.Parent = SendButton  -- Set parent to the send button
+local ButtonCorner = Instance.new("UICorner")
+ButtonCorner.CornerRadius = UDim.new(0, 4)
+ButtonCorner.Parent = SendButton
 
 -- Create Response Text area
-local ResponseText = Instance.new("TextLabel")  -- Create label for response text
-ResponseText.Size = UDim2.new(0.9, 0, 0.1, 0)  -- Set label size
-ResponseText.Position = UDim2.new(0.05, 0, 0.89, 0)  -- Set label position
-ResponseText.BackgroundTransparency = 1  -- Make background transparent
-ResponseText.Text = ""  -- Initially empty
-ResponseText.TextColor3 = Color3.fromRGB(66, 84, 102)  -- Set text color
-ResponseText.Font = Enum.Font.SourceSansSemibold  -- Set font
-ResponseText.TextSize = 14  -- Set text size
-ResponseText.TextWrapped = true  -- Enable text wrapping
-ResponseText.TextXAlignment = Enum.TextXAlignment.Center  -- Center-align text horizontally
-ResponseText.Parent = Frame  -- Set parent to the main frame
+local ResponseText = Instance.new("TextLabel")
+ResponseText.Size = UDim2.new(0.9, 0, 0.1, 0)
+ResponseText.Position = UDim2.new(0.05, 0, 0.89, 0)
+ResponseText.BackgroundTransparency = 1
+ResponseText.Text = ""
+ResponseText.TextColor3 = Color3.fromRGB(66, 84, 102)
+ResponseText.Font = Enum.Font.SourceSansSemibold
+ResponseText.TextSize = 14
+ResponseText.TextWrapped = true
+ResponseText.TextXAlignment = Enum.TextXAlignment.Center
+ResponseText.Parent = Frame
 
 -- Create Undo Button
-undoButton = Instance.new("TextButton")  -- Create button to undo changes
-undoButton.Size = UDim2.new(0.3, 0, 0.1, 0)  -- Set button size
-undoButton.Position = UDim2.new(0.68, 0, 0.88, 0)  -- Set button position
-undoButton.Text = "Undo Changes"  -- Set button text
-undoButton.Font = Enum.Font.SourceSansBold  -- Set font
-undoButton.TextSize = 16  -- Set text size
-undoButton.TextColor3 = Color3.fromRGB(255, 255, 255)  -- Set text color
-undoButton.BackgroundColor3 = Color3.fromRGB(234, 76, 137)  -- Set background color
-undoButton.Parent = Frame  -- Set parent to the main frame
-undoButton.Visible = false  -- Initially hidden
+undoButton = Instance.new("TextButton")
+undoButton.Size = UDim2.new(0.3, 0, 0.1, 0)
+undoButton.Position = UDim2.new(0.68, 0, 0.88, 0)
+undoButton.Text = "Undo Changes"
+undoButton.Font = Enum.Font.SourceSansBold
+undoButton.TextSize = 16
+undoButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+undoButton.BackgroundColor3 = Color3.fromRGB(234, 76, 137)
+undoButton.Parent = Frame
+undoButton.Visible = false
 
-local UndoButtonCorner = Instance.new("UICorner")  -- Create rounded corners for the undo button
-UndoButtonCorner.CornerRadius = UDim.new(0, 4)  -- Set corner radius
-UndoButtonCorner.Parent = undoButton  -- Set parent to the undo button
+local UndoButtonCorner = Instance.new("UICorner")
+UndoButtonCorner.CornerRadius = UDim.new(0, 4)
+UndoButtonCorner.Parent = undoButton
 
 -- Function to update ScrollingFrame size based on text content
 local function updateScrollingFrame()
-	local textBounds = UserRequestInput.TextBounds  -- Get the bounds of the text
-	local frameHeight = ScrollingFrame.AbsoluteSize.Y  -- Get the height of the scrolling frame
-	UserRequestInput.Size = UDim2.new(1, -12, 0, math.max(textBounds.Y, frameHeight))  -- Adjust input box size
-	ScrollingFrame.CanvasSize = UDim2.new(0, 0, 0, math.max(textBounds.Y, frameHeight))  -- Adjust canvas size
+	local textBounds = UserRequestInput.TextBounds
+	local frameHeight = ScrollingFrame.AbsoluteSize.Y
+	UserRequestInput.Size = UDim2.new(1, -12, 0, math.max(textBounds.Y, frameHeight))
+	ScrollingFrame.CanvasSize = UDim2.new(0, 0, 0, math.max(textBounds.Y, frameHeight))
 end
 
 -- Connect the update function to relevant events
@@ -205,200 +213,148 @@ local lastClickTime = 0
 UserRequestInput.InputBegan:Connect(function(input)
 	if input.UserInputType == Enum.UserInputType.MouseButton1 then
 		local currentTime = tick()
-		if currentTime - lastClickTime < 1 then  -- If double-clicked (less than 1 second between clicks)
-			UserRequestInput.Text = ""  -- Clear the text
+		if currentTime - lastClickTime < 1 then
+			UserRequestInput.Text = ""
 		end
 		lastClickTime = currentTime
 	end
 end)
 
 -- Create Dropdown Options
-local options = {"OpenAI", "Anthropic", "Google"}  -- List of API providers
+local options = {"OpenAI", "Anthropic", "Google"}
 for i, option in ipairs(options) do
-	local OptionButton = Instance.new("TextButton")  -- Create button for each option
-	OptionButton.Size = UDim2.new(1, 0, 0.33, 0)  -- Set button size
-	OptionButton.Position = UDim2.new(0, 0, (i-1) * 0.33, 0)  -- Set button position
-	OptionButton.Text = option  -- Set button text to the option name
-	OptionButton.Font = Enum.Font.SourceSans  -- Set font
-	OptionButton.TextSize = 14  -- Set text size
-	OptionButton.TextColor3 = Color3.fromRGB(0, 0, 0)  -- Set text color to black
-	OptionButton.BackgroundColor3 = Color3.fromRGB(255, 255, 255)  -- Set background color to white
-	OptionButton.Parent = DropdownMenu  -- Set parent to the dropdown menu
-	OptionButton.ZIndex = 11  -- Ensure it appears on top of other elements
+	local OptionButton = Instance.new("TextButton")
+	OptionButton.Size = UDim2.new(1, 0, 0.33, 0)
+	OptionButton.Position = UDim2.new(0, 0, (i-1) * 0.33, 0)
+	OptionButton.Text = option
+	OptionButton.Font = Enum.Font.SourceSans
+	OptionButton.TextSize = 14
+	OptionButton.TextColor3 = Color3.fromRGB(0, 0, 0)
+	OptionButton.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+	OptionButton.Parent = DropdownMenu
+	OptionButton.ZIndex = 11
 
 	OptionButton.MouseButton1Click:Connect(function()
-		selectedAPIProvider = option  -- Set the selected API provider
-		APIProviderDropdown.Text = option  -- Update dropdown button text
-		DropdownMenu.Visible = false  -- Hide the dropdown menu
-		APIKeyInput.Visible = true  -- Show the API key input field
-		APIKeyInput.Text = apiKey or "Enter API Key..."  -- Set default text for API key input
-		UseAPIKeyButton.Visible = true  -- Show the Use API Key button
-		ScrollingFrame.Visible = false  -- Hide the scrolling frame
-		SendButton.Visible = false  -- Hide the send button
+		selectedAPIProvider = option
+		APIProviderDropdown.Text = option
+		DropdownMenu.Visible = false
+		APIKeyInput.Visible = true
+		APIKeyInput.Text = apiKey or "Enter API Key..."
+		UseAPIKeyButton.Visible = true
+		ScrollingFrame.Visible = false
+		SendButton.Visible = false
 	end)
 end
 
 -- Toggle Dropdown Menu
 APIProviderDropdown.MouseButton1Click:Connect(function()
-	DropdownMenu.Visible = not DropdownMenu.Visible  -- Toggle visibility of dropdown menu
+	DropdownMenu.Visible = not DropdownMenu.Visible
 	if DropdownMenu.Visible then
-		DropdownMenu.ZIndex = 10  -- Ensure dropdown menu appears on top
-		ScrollingFrame.Visible = true  -- Show the scrolling frame
-		SendButton.Visible = true  -- Show the send button
+		DropdownMenu.ZIndex = 10
+		ScrollingFrame.Visible = true
+		SendButton.Visible = true
 	end
 end)
 
 -- Use API Key Button Click Handler
 UseAPIKeyButton.MouseButton1Click:Connect(function()
-	apiKey = APIKeyInput.Text  -- Store the entered API key
-	APIKeyInput.Visible = false  -- Hide the API key input field
-	UseAPIKeyButton.Visible = false  -- Hide the Use API Key button
-	ScrollingFrame.Visible = true  -- Show the scrolling frame
-	SendButton.Visible = true  -- Show the send button
+	apiKey = APIKeyInput.Text
+	APIKeyInput.Visible = false
+	UseAPIKeyButton.Visible = false
+	ScrollingFrame.Visible = true
+	SendButton.Visible = true
 end)
 
 -- Function to create an undo point
 local function createUndoPoint(description)
-	ChangeHistoryService:SetWaypoint(description)  -- Set a waypoint in the undo history
+	ChangeHistoryService:SetWaypoint(description)
 end
 
--- Function to create the API prompt (generic for all providers)
+-- Function to create the API prompt
 local function createAPIPrompt(codebase, userRequest)
-	-- Construct and return the prompt string for the API request
 	return [[
-		Please analyze the following codebase and make the requested changes. 
-		Respond with a JSON structure containing the original code snippet and the updated version for each change that was requested.
-
+		Please analyze the following codebase and make the requested changes. You need to determine the number of actions required to implement the change, the type of each action, and each action should be it's own array with the appropriate values in the array of changes. 
+		
+		There are 3 types of action: 
+		1) Modify Existing Code: Identify the service, script, and code chunk relevant to the action required by the user's prompt, respond with the original code snippet as the "previousCode" value, the "newCode" value which is the updated version of the code snippet, and the "explanation" which is a text explanation of the changes made and the part of the user's request that prompted those changes. 
+		2) Add new code without modifying existing code snippets. Identify the service and script relevant most relevant to the action required by the user's prompt, only if there is an appropriate service and script already existing do we proceed with this type of action, otherwise we do a "NewScript" action. If we have identified a service and script properly relevant, we respond with this "AddOnly" action and it's "newCode" value which is the new code snippet, and the "explanation" which is a text explanation of the changes made and the part of the user's request that prompted those changes. 
+		3) Create a new script and populate it with the code required to complete the requirements. This is the action type that occurs when we cannot identify an appropriately relevant pre-existing service and script, or service, script, and code chunk to warrant a "ModifyExisting" or a "AddOnly" action. In this scenario we create a new script and populate it with the code required to complete the requirement. 
+		
+		Respond with a JSON structure containing the appropriate actions to complete the requirements that were requested.
+		
 		User Request: ]] .. userRequest .. [[  
-
-		Codebase:
-		]] .. codebase .. [[ 
-
-		Please provide your response in the following JSON format:
+		
+		Codebase:]] .. codebase .. [[ 
+		
+		Remember that you need to consider the dependencies your newCode will need, and if the previousCode doesn't have them, they need to be in your newCode at the appropriate place in the script: 
+			- If it's a ModifyExisting action type or AddOnly action type and your newCode response has dependencies it relies on, if the if your previouscode doesn't have the required dependencies you need to add in the necessary dependencies to the appropriate location of the newcode. An example is if your newCode had "ReplicatedStorage.RoundStartBindableEvent.Event:Connect(onBindableEvent)" and the previousCode didn't already have "local ReplicatedStorage = game:getservice("ReplicatedStorage")" you would need to add that dependency declaration to the top of the script in your newcode, etc...
+			- If it's a NewScript action type, then obviously the required dependencies won't be there yet so you need to include them.
+		
+		Keep in mind that Roblox development requires that dependencies are chronologically defined in the order that they are used, you can't use a dependency if it wasn't defined on a previous line.
+		
+		Regarding your response in json structure please note: 
+			1) We are using camelCase for our capitalization structure of the responses keys
+			2) Please provide your response as a raw JSON object without any markdown formatting or code block indicators. Do not use triple backticks (```) or any other formatting around the JSON. The response should start with an opening curly brace ({) and end with a closing curly brace (}).
+			3) Provide your response in the following JSON format, just respond with this json structure, no extra fluff, your response is going directly into a json decoder so any fluff will break it:
 		{
 		    "changes": [
 		        {
+                    "actionType": "ModifyExisting",
 		            "previousCode": "Exact snippet of code to be replaced",
 		            "newCode": "Updated version of the code snippet",
+                    "scriptName": "Name of the script where the action is being implemented",
+                    "serviceName": "Name of the service where the action is being implemented",
+                    "lineNumber": null (modifications occur where the existing relevant code chunks are being changed, with the previous code commented above the new code),
+		            "explanation": "Brief explanation of the changes made"
+		        },
+                 {
+                    "actionType": "AddOnly",
+		            "previousCode": null,
+		            "newCode": "The new code snippet",
+                    "scriptName": "Name of the script where the action is being implemented",
+                    "serviceName": "Name of the service where the action is being implemented",
+                    "lineNumber": null (modifications occur where the existing relevant code chunks are being changed, with the previous code commented above the new code),
+		            "explanation": "Brief explanation of the changes made"
+		        },
+                {
+                    "actionType": "NewScript
+                    "actionType": "NewScript"
+		            "previousCode": null,
+		            "newCode": "The new code snippet",
+                    "scriptName": "Name of the script where the action is being implemented",
+                    "serviceName": "Name of the service where the action is being implemented",
+                    "lineNumber": null (modifications occur where the existing relevant code chunks are being changed, with the previous code commented above the new code),
 		            "explanation": "Brief explanation of the changes made"
 		        }
 		    ]
 		}
-
 		Only include the JSON in your response, without any additional text or formatting.
 	]]
 end
 
--- Function to serialize scripts from a specific service
-local function serializeScriptsFromService(service)
-	-- Initialize an empty table to store serialized script data
-	local scriptsData = {}
+local function cleanAPIResponse(response)
+	-- Remove any leading or trailing whitespace
+	response = response:match("^%s*(.-)%s*$")
 
-	-- Iterate through all descendants of the given service
-	for _, script in ipairs(service:GetDescendants()) do
-		-- Check if the descendant is a Script, LocalScript, or ModuleScript
-		if script:IsA("Script") or script:IsA("LocalScript") or script:IsA("ModuleScript") then
-			-- Add the script's data to the scriptsData table
-			table.insert(scriptsData, {
-				Name = script.Name,  -- Store the script's name
-				ClassName = script.ClassName,  -- Store the script's class name (Script, LocalScript, or ModuleScript)
-				ParentName = script.Parent and script.Parent.Name or "None",  -- Store the parent's name, or "None" if there's no parent
-				Source = script.Source  -- Store the script's source code
-			})
-		end
+	-- Remove triple backticks and the word "json" if present
+	response = response:gsub("^```json%s*", ""):gsub("^```%s*", ""):gsub("%s*```$", "")
+
+	-- Ensure the response starts with { and ends with }
+	if not response:match("^%s*{") or not response:match("}%s*$") then
+		error("Invalid JSON response")
 	end
 
-	-- Print a log message with the number of scripts serialized and the service name
-	print("Serialized " .. #scriptsData .. " scripts from " .. service.Name)
-
-	-- Return the table containing all serialized script data
-	return scriptsData
+	return response
 end
-
--- Function to serialize all scripts and create backups
-local function serializeAllScripts()
-	-- Initialize an empty table to store all serialized script data
-	local allScriptsData = {}
-
-	-- Clear previous backups
-	scriptBackups = {}
-
-	-- Define the services to check for scripts
-	local servicesToCheck = {game.ServerScriptService, game.ReplicatedStorage, game.StarterGui}
-
-	-- Iterate through each service in the servicesToCheck list
-	for _, serviceBeingChecked in pairs(servicesToCheck) do
-		-- Iterate through all descendants of the current service
-		for _, script in ipairs(serviceBeingChecked:GetDescendants()) do
-			-- Check if the descendant is a Script, LocalScript, or ModuleScript
-			if script:IsA("Script") or script:IsA("LocalScript") or script:IsA("ModuleScript") then
-				-- Create a table to store the current script's data
-				local scriptData = {
-					Name = script.Name,  -- Store the script's name
-					ClassName = script.ClassName,  -- Store the script's class name
-					ParentName = script.Parent and script.Parent.Name or "None",  -- Store the parent's name, or "None" if there's no parent
-					Source = script.Source  -- Store the script's source code
-				}
-
-				-- Add the script data to the allScriptsData table
-				table.insert(allScriptsData, scriptData)
-
-				-- Create a backup of the script by storing its source code
-				scriptBackups[script] = script.Source
-			end
-		end
-	end
-
-	-- Print a log message with the number of scripts serialized and backed up, and the number of services checked
-	print("Serialized and backed up " .. #allScriptsData .. " scripts from " .. #servicesToCheck .. " services")
-
-	-- Return the table containing all serialized script data
-	return allScriptsData
-end
-
--- Function to revert changes made to scripts
-local function revertChanges()
-	-- Iterate through each script and its original source in the scriptBackups table
-	for script, originalSource in pairs(scriptBackups) do
-		-- Check if the script is still a valid Script, LocalScript, or ModuleScript
-		if script:IsA("Script") or script:IsA("LocalScript") or script:IsA("ModuleScript") then
-			-- Restore the original source code to the script
-			script.Source = originalSource
-
-			-- Use ScriptEditorService to update the script's source asynchronously
-			ScriptEditorService:UpdateSourceAsync(script, function()
-				return originalSource
-			end)
-		end
-	end
-
-	-- Update the ResponseText to indicate that changes have been reverted
-	ResponseText.Text = "Changes reverted"
-
-	-- Set the text color to green to indicate success
-	ResponseText.TextColor3 = Color3.fromRGB(36, 180, 126)
-
-	-- Hide the undo button as changes have been reverted
-	undoButton.Visible = false
-end
-
--- Connect the revertChanges function to the undo button's click event
-undoButton.MouseButton1Click:Connect(revertChanges)
 
 -- Function to send request to the selected API
 local function sendToAPI(scriptData, userRequest)
-	-- Create the API prompt using the scriptData and userRequest
 	local prompt = createAPIPrompt(HttpService:JSONEncode(scriptData), userRequest)
-
-	-- Initialize variables for API request
 	local url, headers, body
 
-	-- Log that we're about to send to the API
 	print("Going to send to api")
 
-	-- Configure the API request based on the selected provider
 	if selectedAPIProvider == "OpenAI" then
-		-- OpenAI API configuration
 		url = "https://api.openai.com/v1/chat/completions"
 		headers = {
 			["Content-Type"] = "application/json",
@@ -410,7 +366,6 @@ local function sendToAPI(scriptData, userRequest)
 			max_tokens = 4096
 		})
 	elseif selectedAPIProvider == "Anthropic" then
-		-- Anthropic API configuration
 		url = "https://api.anthropic.com/v1/messages"
 		headers = {
 			["Content-Type"] = "application/json",
@@ -423,7 +378,6 @@ local function sendToAPI(scriptData, userRequest)
 			max_tokens = 4096
 		})
 	elseif selectedAPIProvider == "Google" then
-		-- Google API configuration
 		print("Google is provider, sending a prompt to google.")
 		url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent"
 		headers = {
@@ -440,15 +394,12 @@ local function sendToAPI(scriptData, userRequest)
 				maxOutputTokens = 4096,
 			},
 		})
-		-- Append API key to URL for Google's API
 		url = url .. "?key=" .. apiKey
 		print("URL we're sending to google is: ", url)
 	else
-		-- Return an error if an invalid API provider is selected
 		return "Error: Invalid API provider selected"
 	end
 
-	-- Make the API request
 	local success, response = pcall(function()
 		return HttpService:RequestAsync({
 			Url = url,
@@ -458,124 +409,215 @@ local function sendToAPI(scriptData, userRequest)
 		})
 	end)
 
-	-- Process the API response
 	if success then
 		if response.Success then
-			-- Parse the response based on the selected API provider
 			local responseData = HttpService:JSONDecode(response.Body)
 			if selectedAPIProvider == "OpenAI" then
-				return responseData.choices[1].message.content
+				return cleanAPIResponse(responseData.choices[1].message.content)
 			elseif selectedAPIProvider == "Anthropic" then
-				return responseData.content[1].text
+				return cleanAPIResponse(responseData.content[1].text)
 			elseif selectedAPIProvider == "Google" then
-				return responseData.candidates[1].content.parts[1].text
+				return cleanAPIResponse(responseData.candidates[1].content.parts[1].text)
 			end
 		else
-			-- Log the full response if the request was not successful
 			print(response)
 			return "Error: API request failed with status "
 		end
 	else
-		-- Return an error message if the request failed
 		return "Error: " .. tostring(response)
 	end
 end
 
+
+
+
+
 -- Function to apply code changes suggested by API
 local function applyCodeChanges(apiResponse)
-	-- Log the start of the function
 	print("Applying code changes function started")
-
-	-- Parse the changes from the API response
-	local changes = HttpService:JSONDecode(apiResponse).changes
-
-	-- Log the content of changes to be applied
+	local cleanedResponse = cleanAPIResponse(apiResponse)
+	local changes = HttpService:JSONDecode(cleanedResponse).changes
 	print("Content of changes to apply in applyCodeChanges function are: ", changes)
 
-	-- Iterate through each change suggested by the API
 	for _, change in ipairs(changes) do
-		local previousCode = change.previousCode
-		local newCode = change.newCode
+		if change.actionType == "ModifyExisting" then
+			local previousCode = change.previousCode
+			local newCode = change.newCode
+			local scriptName = change.scriptName
+			local serviceName = change.serviceName
 
-		-- Log the previous and new code for each change
-		print("Previous code is: ", previousCode)
-		print("New Code is: ", newCode)
+			print("Previous code is: ", previousCode)
+			print("New Code is: ", newCode)
 
-		-- Iterate through relevant services to find and update scripts
-		for _, service in ipairs({game.ServerScriptService, game.ReplicatedStorage, game.StarterGui}) do
-			for _, script in ipairs(service:GetDescendants()) do
-				-- Check if the descendant is a Script, LocalScript, or ModuleScript
-				if script:IsA("Script") or script:IsA("LocalScript") or script:IsA("ModuleScript") then
+			local service = game:GetService(serviceName)
+			if service then
+				local script = service:FindFirstChild(scriptName, true)
+				if script and (script:IsA("Script") or script:IsA("LocalScript") or script:IsA("ModuleScript")) then
 					local source = script.Source
-					-- Find the exact location of the code to be replaced
 					local startIndex, endIndex = string.find(source, previousCode, 1, true)
 
 					if startIndex then
-						-- Log that matching code was found
 						print("Matching code found in Script: ", script.Name)
-
-						-- Comment out the previous code
 						local commentedCode = string.gsub(previousCode, "([^\r\n]+)", "--[[ %1 ]]")
-
-						-- Construct the updated source with commented old code and new code
 						local updatedSource = string.sub(source, 1, startIndex - 1) .. commentedCode .. "\n" .. newCode .. "\n" .. string.sub(source, endIndex + 1)
-
-						-- Update the script's source
 						script.Source = updatedSource
 
-						-- Use ScriptEditorService to update the script's source asynchronously
-						ScriptEditorService:UpdateSourceAsync(script, function(previousCode)
+						ScriptEditorService:UpdateSourceAsync(script, function()
 							return updatedSource
 						end)
 
-						-- Open the updated script in the editor
 						plugin:OpenScript(script, startIndex)
-
-						-- Log the details of the updated script
 						print("Updated script: " .. script.Name .. " in Service: " .. service.Name .. " \n \n \n \n With updated source of:" .. updatedSource)
-						break
-					end 
+					end
 				end
+			end
+		elseif change.actionType == "AddOnly" then
+			local newCode = change.newCode
+			local scriptName = change.scriptName
+			local serviceName = change.serviceName
+
+			local service = game:GetService(serviceName)
+			if service then
+				local script = service:FindFirstChild(scriptName, true)
+				if script and (script:IsA("Script") or script:IsA("LocalScript") or script:IsA("ModuleScript")) then
+					local updatedSource = script.Source .. "\n\n" .. newCode
+					script.Source = updatedSource
+
+					ScriptEditorService:UpdateSourceAsync(script, function()
+						return updatedSource
+					end)
+
+					plugin:OpenScript(script, #script.Source)
+					print("Added code to script: " .. script.Name .. " in Service: " .. service.Name)
+				end
+			end
+		elseif change.actionType == "NewScript" then
+			local newCode = change.newCode
+			local scriptName = change.scriptName
+			local serviceName = change.serviceName
+
+			print("We know its a new script request, newcode is: ", newCode," scriptName is: ", scriptName, " Servicename is: ",serviceName)
+
+			local service = game:GetService(serviceName)
+			if service then
+				print("we found the service to place the new script in which is: ", service)
+				local newScript = Instance.new("Script")
+				newScript.Name = scriptName
+				newScript.Source = newCode
+				newScript.Parent = service
+
+				scriptBackups[newScript] = ""  --Empty string indicates it's a new script. 
+
+				plugin:OpenScript(newScript, 1)
+				print("Created new script: " .. scriptName .. " in Service: " .. serviceName)
 			end
 		end
 	end
 end
 
+-- Function to serialize scripts from a specific service
+local function serializeScriptsFromService(service)
+	local scriptsData = {}
+
+	for _, script in ipairs(service:GetDescendants()) do
+		if script:IsA("Script") or script:IsA("LocalScript") or script:IsA("ModuleScript") then
+			table.insert(scriptsData, {
+				Name = script.Name,
+				ClassName = script.ClassName,
+				ParentName = script.Parent and script.Parent.Name or "None",
+				Source = script.Source
+			})
+		end
+	end
+
+	print("Serialized " .. #scriptsData .. " scripts from " .. service.Name)
+
+	return scriptsData
+end
+
+
+-- Modify the serializeAllScripts function
+local function serializeAllScripts()
+	local allScriptsData = {}
+	scriptBackups = {}
+	existingScripts = {}  -- Reset the existing scripts list
+
+	local servicesToCheck = {game.ServerScriptService, game.ReplicatedStorage, game.StarterGui}
+
+	for _, serviceBeingChecked in pairs(servicesToCheck) do
+		for _, script in ipairs(serviceBeingChecked:GetDescendants()) do
+			if script:IsA("Script") or script:IsA("LocalScript") or script:IsA("ModuleScript") then
+				local scriptData = {
+					Name = script.Name,
+					ClassName = script.ClassName,
+					ParentName = script.Parent and script.Parent.Name or "None",
+					Source = script.Source
+				}
+
+				table.insert(allScriptsData, scriptData)
+				scriptBackups[script] = script.Source
+				table.insert(existingScripts, script)  -- Add this line to keep track of existing scripts
+			end
+		end
+	end
+
+	print("Serialized and backed up " .. #allScriptsData .. " scripts from " .. #servicesToCheck .. " services")
+
+	return allScriptsData
+end
+
+local function revertChanges()
+	for script, originalSource in pairs(scriptBackups) do
+		if script:IsA("Script") or script:IsA("LocalScript") or script:IsA("ModuleScript") then
+			if table.find(existingScripts, script) then
+				-- This is an existing script, revert its contents
+				script.Source = originalSource
+
+				ScriptEditorService:UpdateSourceAsync(script, function()
+					return originalSource
+				end)
+			else
+				-- This is a new script, remove it
+				script:Destroy()
+			end
+		end
+	end
+
+	-- Remove any new scripts that were created
+	local servicesToCheck = {game.ServerScriptService, game.ReplicatedStorage, game.StarterGui}
+	for _, service in ipairs(servicesToCheck) do
+		for _, script in ipairs(service:GetDescendants()) do
+			if (script:IsA("Script") or script:IsA("LocalScript") or script:IsA("ModuleScript")) and not table.find(existingScripts, script) then
+				script:Destroy()
+			end
+		end
+	end
+
+	ResponseText.Text = "Changes reverted"
+	ResponseText.TextColor3 = Color3.fromRGB(36, 180, 126)
+	undoButton.Visible = false
+end
+
+-- Connect the revertChanges function to the undo button's click event
+undoButton.MouseButton1Click:Connect(revertChanges)
+
 -- Function to update code based on user request
 local function updateCode()
-	-- Get the user's request from the input field
 	local userRequest = UserRequestInput.Text
-
-	-- Serialize and backup all scripts
 	local serializedScripts = serializeAllScripts()
-
-	-- Send request to API with serialized scripts and user request
 	local apiResponse = sendToAPI(serializedScripts, userRequest)
 
-	-- Check if the API response indicates an error
 	if apiResponse:sub(1, 5) == "Error" then
-		-- Display error message in the ResponseText
 		ResponseText.Text = apiResponse
-		-- Set text color to red to indicate error
 		ResponseText.TextColor3 = Color3.fromRGB(234, 76, 137)
 	else
-		-- Log that we're about to apply changes
 		print("Going to apply changes: ", apiResponse)
-
-		-- Apply the changes suggested by the API
 		applyCodeChanges(apiResponse)
-
-		-- Display success message in the ResponseText
 		ResponseText.Text = "Success"
-
-		-- Set text color to green to indicate success
 		ResponseText.TextColor3 = Color3.fromRGB(36, 180, 126)
-
-		-- Show the undo button
 		undoButton.Visible = true
 	end
 
-	-- Log completion of updateCode function
 	print("Completed updateCode function")
 end
 
@@ -588,13 +630,11 @@ local toggleButton = toolbar:CreateButton("ToggleUpdater", "Toggle Code Updater"
 
 -- Toggle button handler
 toggleButton.Click:Connect(function()
-	-- Toggle the visibility of the plugin GUI
 	pluginGui.Enabled = not pluginGui.Enabled
 end)
 
 -- Initialize the plugin
 local function init()
-	-- Hide UI elements initially
 	ScrollingFrame.Visible = false
 	SendButton.Visible = false
 	APIKeyInput.Visible = false
