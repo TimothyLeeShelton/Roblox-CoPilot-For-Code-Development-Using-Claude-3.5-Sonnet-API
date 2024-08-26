@@ -370,12 +370,13 @@ local function sendToAPI(scriptData, userRequest)
 		headers = {
 			["Content-Type"] = "application/json",
 			["x-api-key"] = apiKey,
-			["anthropic-version"] = "2023-06-01"
+			["anthropic-version"] = "2023-06-01",
+			["anthropic-beta"] = "max-tokens-3-5-sonnet-2024-07-15"
 		}
 		body = HttpService:JSONEncode({
 			model = "claude-3-5-sonnet-20240620",
-			messages = {{role = "user", content = prompt}},
-			max_tokens = 4096
+			max_tokens = 8192,
+			messages = {{role = "user", content = prompt}}
 		})
 	elseif selectedAPIProvider == "Google" then
 		print("Google is provider, sending a prompt to google.")
