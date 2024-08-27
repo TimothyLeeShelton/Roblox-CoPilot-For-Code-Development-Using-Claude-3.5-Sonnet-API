@@ -1,10 +1,6 @@
 --Fun statement to test a single script being changed at a time: Add a print statement to the onboardingtutorialcontrol script in serverscriptservice at the start of the "updateDataStore" function. 
 --Fun statement to test multiple scripts being changed at a time: Add a print statement to the onboardingtutorialcontrol script in serverscriptservice at the start of the "updateDataStore" function. For a second change, adjust the MAX_PAIRS_PER_KEY value in TimePlayedDataStore to 19999.
 
-
-
-
-
 --Going to add "I'm Feeling lucky" wildcards where we essentially create pickable cards of what the user could build. 
 --Going to add some kind of loading screen indicator while we wait for prompts to complete so users know to chill. 
 
@@ -22,6 +18,23 @@ local apiKey = nil
 local existingScripts = {} 
 local scriptBackups = {}
 local undoButton
+
+-- List of services to check 
+local servicesToCheck = {
+	game.ServerScriptService,
+	game.ReplicatedStorage,
+	game.StarterGui,
+	game.StarterPlayer.StarterPlayerScripts,
+	game.StarterPlayer.StarterCharacterScripts,
+	game.Workspace
+}
+
+-- Table to keep track of selected services
+local selectedServices = {}
+for _, service in ipairs(servicesToCheck) do
+	selectedServices[service] = true  -- Initially, all services are selected
+end
+
 
 -- Create DockWidgetPluginGui
 local widgetInfo = DockWidgetPluginGuiInfo.new(
@@ -48,6 +61,84 @@ Frame.Parent = pluginGui
 local FrameCorner = Instance.new("UICorner")
 FrameCorner.CornerRadius = UDim.new(0, 8)
 FrameCorner.Parent = Frame
+-- Create Settings Button
+local SettingsButton = Instance.new("TextButton")
+SettingsButton.Size = UDim2.new(0.3, 0, 0.1, 0)
+SettingsButton.Position = UDim2.new(0.02, 0, 0.02, 0)
+SettingsButton.Text = "Settings"
+SettingsButton.Font = Enum.Font.SourceSansBold
+SettingsButton.TextSize = 14
+SettingsButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+SettingsButton.BackgroundColor3 = Color3.fromRGB(99, 91, 255)
+SettingsButton.Parent = Frame
+
+local SettingsButtonCorner = Instance.new("UICorner")
+SettingsButtonCorner.CornerRadius = UDim.new(0, 4)
+SettingsButtonCorner.Parent = SettingsButton
+
+-- Create Settings Menu
+local SettingsMenu = Instance.new("Frame")
+SettingsMenu.Size = UDim2.new(0.9, 0, 0.8, 0)
+SettingsMenu.Position = UDim2.new(0.05, 0, 0.15, 0)
+SettingsMenu.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+SettingsMenu.Visible = false
+SettingsMenu.Parent = Frame
+
+local SettingsMenuCorner = Instance.new("UICorner")
+SettingsMenuCorner.CornerRadius = UDim.new(0, 4)
+SettingsMenuCorner.Parent = SettingsMenu
+
+-- Create ScrollingFrame for settings
+local SettingsScrollingFrame = Instance.new("ScrollingFrame")
+SettingsScrollingFrame.Size = UDim2.new(1, -20, 1, -20)
+SettingsScrollingFrame.Position = UDim2.new(0, 10, 0, 10)
+SettingsScrollingFrame.BackgroundTransparency = 1
+SettingsScrollingFrame.ScrollBarThickness = 6
+SettingsScrollingFrame.ScrollingDirection = Enum.ScrollingDirection.Y
+SettingsScrollingFrame.VerticalScrollBarPosition = Enum.VerticalScrollBarPosition.Right
+SettingsScrollingFrame.Parent = SettingsMenu
+
+-- Create checkboxes for each service
+local checkboxes = {}
+for i, service in ipairs(servicesToCheck) do
+	local checkbox = Instance.new("TextButton")
+	checkbox.Size = UDim2.new(1, -20, 0, 30)
+	checkbox.Position = UDim2.new(0, 10, 0, (i-1) * 40)
+	checkbox.Text = service.Name
+	checkbox.Font = Enum.Font.SourceSans
+	checkbox.TextSize = 14
+	checkbox.TextColor3 = Color3.fromRGB(0, 0, 0)
+	checkbox.BackgroundColor3 = Color3.fromRGB(220, 220, 220)
+	checkbox.Parent = SettingsScrollingFrame
+
+	local checkboxCorner = Instance.new("UICorner")
+	checkboxCorner.CornerRadius = UDim.new(0, 4)
+	checkboxCorner.Parent = checkbox
+
+	local function updateCheckboxAppearance()
+		if selectedServices[service] then
+			checkbox.BackgroundColor3 = Color3.fromRGB(80, 80, 80) -- Darker gray
+			checkbox.TextColor3 = Color3.fromRGB(255, 255, 255) -- White
+			checkbox.Text = service.Name .. " (In use)"
+		else
+			checkbox.BackgroundColor3 = Color3.fromRGB(220, 220, 220) -- Light gray
+			checkbox.TextColor3 = Color3.fromRGB(0, 0, 0) -- Black
+			checkbox.Text = service.Name
+		end
+	end
+
+	checkbox.MouseButton1Click:Connect(function()
+		selectedServices[service] = not selectedServices[service]
+		updateCheckboxAppearance()
+	end)
+
+	updateCheckboxAppearance() -- Set initial appearance
+
+	table.insert(checkboxes, {button = checkbox, service = service})
+end
+
+SettingsScrollingFrame.CanvasSize = UDim2.new(0, 0, 0, #servicesToCheck * 40)
+
 
 -- Create API Provider Dropdown
 local APIProviderDropdown = Instance.new("TextButton")
@@ -243,6 +334,7 @@ for i, option in ipairs(options) do
 		UseAPIKeyButton.Visible = true
 		ScrollingFrame.Visible = false
 		SendButton.Visible = false
+		SettingsMenu.Visible = false
 	end)
 end
 
@@ -251,8 +343,9 @@ APIProviderDropdown.MouseButton1Click:Connect(function()
 	DropdownMenu.Visible = not DropdownMenu.Visible
 	if DropdownMenu.Visible then
 		DropdownMenu.ZIndex = 10
-		ScrollingFrame.Visible = true
-		SendButton.Visible = true
+		ScrollingFrame.Visible = false
+		SendButton.Visible = false
+		SettingsMenu.Visible = false
 	end
 end)
 
@@ -263,6 +356,7 @@ UseAPIKeyButton.MouseButton1Click:Connect(function()
 	UseAPIKeyButton.Visible = false
 	ScrollingFrame.Visible = true
 	SendButton.Visible = true
+	SettingsMenu.Visible = false
 end)
 
 -- Function to create an undo point
@@ -537,32 +631,33 @@ local function serializeScriptsFromService(service)
 end
 
 
--- Modify the serializeAllScripts function
+-- Serialize all functions together to send to API service. 
 local function serializeAllScripts()
 	local allScriptsData = {}
 	scriptBackups = {}
 	existingScripts = {}  -- Reset the existing scripts list
 
-	local servicesToCheck = {game.ServerScriptService, game.ReplicatedStorage, game.StarterGui}
+	for _, checkbox in ipairs(checkboxes) do
+		if selectedServices[checkbox.service] then
+			local serviceBeingChecked = checkbox.service
+			for _, script in ipairs(serviceBeingChecked:GetDescendants()) do
+				if script:IsA("Script") or script:IsA("LocalScript") or script:IsA("ModuleScript") then
+					local scriptData = {
+						Name = script.Name,
+						ClassName = script.ClassName,
+						ParentName = script.Parent and script.Parent.Name or "None",
+						Source = script.Source
+					}
 
-	for _, serviceBeingChecked in pairs(servicesToCheck) do
-		for _, script in ipairs(serviceBeingChecked:GetDescendants()) do
-			if script:IsA("Script") or script:IsA("LocalScript") or script:IsA("ModuleScript") then
-				local scriptData = {
-					Name = script.Name,
-					ClassName = script.ClassName,
-					ParentName = script.Parent and script.Parent.Name or "None",
-					Source = script.Source
-				}
-
-				table.insert(allScriptsData, scriptData)
-				scriptBackups[script] = script.Source
-				table.insert(existingScripts, script)  -- Add this line to keep track of existing scripts
+					table.insert(allScriptsData, scriptData)
+					scriptBackups[script] = script.Source
+					table.insert(existingScripts, script)
+				end
 			end
 		end
 	end
 
-	print("Serialized and backed up " .. #allScriptsData .. " scripts from " .. #servicesToCheck .. " services")
+	print("Serialized and backed up " .. #allScriptsData .. " scripts from selected services")
 
 	return allScriptsData
 end
@@ -634,12 +729,23 @@ toggleButton.Click:Connect(function()
 	pluginGui.Enabled = not pluginGui.Enabled
 end)
 
--- Initialize the plugin
+-- Add Settings button click handler
+SettingsButton.MouseButton1Click:Connect(function()
+	local isSettingsVisible = SettingsMenu.Visible
+	SettingsMenu.Visible = not isSettingsVisible
+	ScrollingFrame.Visible = isSettingsVisible
+	SendButton.Visible = isSettingsVisible
+	APIKeyInput.Visible = isSettingsVisible
+	UseAPIKeyButton.Visible = isSettingsVisible
+end)
+
+-- Modify the init function
 local function init()
 	ScrollingFrame.Visible = false
 	SendButton.Visible = false
 	APIKeyInput.Visible = false
 	UseAPIKeyButton.Visible = false
+	SettingsMenu.Visible = false
 end
 
 -- Call the initialization function
