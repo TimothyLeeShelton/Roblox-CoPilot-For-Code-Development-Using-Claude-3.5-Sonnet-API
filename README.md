@@ -4,7 +4,7 @@
 
 This plugin allows you to make code changes across multiple scripts in your game with natural language requests, streamlining the development process and enhancing productivity. The RoCopilot - Roblox Coding Agent Plugin is a powerful tool that allows developers to choose their AI model of choice and their own API keys to make natural language requests into new scripts, updated existing scripts, and net new code development. 
 ## Demo Video Link
-https://www.youtube.com/watch?v=xd7TuNURKYw
+[https://www.youtube.com/watch?v=xd7TuNURKYw](https://youtu.be/0aTJVVekrnU)
 
 ## Features
 
